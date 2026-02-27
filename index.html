@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ENTROPY</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <style>
+        body {
+            margin: 0; background: #000; color: #fff;
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            overflow: hidden; height: 100vh;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+
+        /* 타이틀 디자인 및 레이아웃 */
+        #ui-layer { z-index: 10; padding: 20px; text-align: center; width: 90%; max-width: 400px; }
+        h1 { 
+            margin-bottom: 5px; letter-spacing: 5px; font-weight: 900; font-size: 2.8rem; 
+            background: linear-gradient(to bottom, #fff 0%, #444 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .subtitle { margin-top: 0; color: #666; font-size: 0.85rem; margin-bottom: 45px; letter-spacing: 1px; }
+        
+        input, button { 
+            padding: 18px; border-radius: 15px; border: none; margin: 10px 0; width: 100%; box-sizing: border-box;
+            font-size: 1rem; outline: none; transition: 0.3s;
+        }
+        #choices { background: #111; color: #fff; border: 1px solid #222; }
+        #seed { background: #0a0a0a; color: #444; text-align: center; }
+        
+        /* 버튼 디자인: 블랙홀로 빨려들어가기 전의 에너지를 표현 */
+        button { 
+            background: #fff; color: #000; font-weight: bold; cursor: pointer; 
+            box-shadow: 0 0 20px rgba(255,255,255,0.2);
+        }
+        button:active { transform: scale(0.96); opacity: 0.8; }
+
+        /* 블랙홀 애니메이션 */
+        #black-hole {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 80px; height: 80px; background: #000; border-radius: 50%; 
+            box-shadow: 0 0 40px #6a11cb, 0 0 80px #2575fc, inset 0 0 20px #fff;
+            display: none; transition: all 2s ease; z-index: 5;
+        }
+        .choice-particle {
+            position: absolute; transition: all 5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+            font-size: 1.1rem; white-space: nowrap; opacity: 1; z-index: 2; color: #aaa;
+        }
+        
+        /* 결과 화면 */
+        #result-container { text-align: center; display: none; z-index: 20; padding: 30px; }
+        #result { font-size: 3.2rem; font-weight: 900; margin-bottom: 25px; text-shadow: 0 0 20px rgba(255,255,255,0.5); }
+        #lucky-msg { font-size: 1rem; color: #888; line-height: 1.6; border-top: 1px solid #222; padding-top: 25px; word-break: keep-all; }
+        
+        /* 로딩 텍스트 수정 반영 */
+        #loading-text { position: absolute; bottom: 12%; color: #444; font-size: 0.9rem; letter-spacing: 2px; display: none; }
+        .help-text { font-size: 0.75rem; color: #333; margin-top: 25px; }
+    </style>
+</head>
+<body>
+
+<div id="ui-layer">
+    <h1>ENTROPY</h1>
+    <p class="subtitle">무작위가 만드는 가장 논리적인 결론</p>
+    
+    <input type="text" id="choices" placeholder="선택지를 콤마(,)로 구분" spellcheck="false">
+    <input type="number" id="seed" placeholder="무작위 숫자 입력(선택사항)">
+    <button onclick="startCosmicEvent()">운명 결정 시작 (5s)</button>
+    
+    <p class="help-text">*결정하기 힘든 선택지들을 블랙홀 속으로 던지세요.</p>
+</div>
+
+<div id="black-hole"></div>
+<div id="loading-text">우주의 기운을 받아 선택 중</div>
+
+<div id="result-container">
+    <div id="result"></div>
+    <div id="lucky-msg"></div>
+    <button onclick="location.reload()" style="background: none; color: #555; border: 1px solid #222; width: auto; padding: 10px 30px; margin-top: 60px; font-size: 0.8rem;">다시 시도</button>
+</div>
+
+<script>
+    const messages = [
+        "당신의 복잡한 고민보다, 때로는 하늘의 뜻이 더 정확할 수 있습니다.",
+        "결과가 마음에 들지 않는다면, 당신의 마음은 이미 정답을 알고 있는 것입니다.",
+        "억지로 무언가를 하려 애쓰지 마세요. 가만히 견디는 것만으로도 당신은 더 단단해집니다.",
+        "운은 실력을 가리는 방해물이 아니라, 우리 삶을 움직이는 가장 큰 힘입니다.",
+        "작은 흔들림과 변화를 받아들이세요. 그 과정이 당신을 결국 강하게 만듭니다.",
+        "성공은 치밀한 계획의 산물이 아니라, 끝까지 포기하지 않고 살아남은 자의 전유물입니다.",
+        "앞날을 알 수 없다는 불안함을 즐기세요. 그것이 당신이 가진 무한한 가능성입니다.",
+        "오늘의 우연이 당신의 내일을 바꾸는 결정적인 순간이 될 것입니다."
+    ];
+
+    function startCosmicEvent() {
+        const input = document.getElementById('choices').value;
+        const choices = input.split(',').map(s => s.trim()).filter(s => s);
+        if (choices.length < 2) return alert("선택지를 최소 2개 입력하세요.");
+
+        // [진동 기능] 시작 시 가벼운 진동
+        if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+
+        const ui = document.getElementById('ui-layer');
+        const bh = document.getElementById('black-hole');
+        const loadTxt = document.getElementById('loading-text');
+        const resCont = document.getElementById('result-container');
+
+        ui.style.display = 'none';
+        bh.style.display = 'block';
+        loadTxt.style.display = 'block';
+
+        choices.forEach((text, i) => {
+            const el = document.createElement('div');
+            el.className = 'choice-particle';
+            el.innerText = text;
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 150 + Math.random() * 100;
+            el.style.left = `calc(50% + ${Math.cos(angle) * dist}px)`;
+            el.style.top = `calc(50% + ${Math.sin(angle) * dist}px)`;
+            document.body.appendChild(el);
+
+            setTimeout(() => {
+                el.style.left = '50%';
+                el.style.top = '50%';
+                el.style.transform = 'scale(0) rotate(1440deg)';
+                el.style.opacity = '0';
+            }, 100); 
+        });
+
+        setTimeout(() => {
+            // [진동 기능] 결정 직전 강렬한 진동
+            if (navigator.vibrate) navigator.vibrate(200);
+
+            bh.style.transform = 'translate(-50%, -50%) scale(20)';
+            bh.style.opacity = '0';
+            loadTxt.style.opacity = '0';
+
+            const seed = document.getElementById('seed').value;
+            let selectedIndex;
+            if (seed) {
+                let hash = 0;
+                const str = seed + choices.join('');
+                for (let i = 0; i < str.length; i++) {
+                    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                    hash |= 0;
+                }
+                selectedIndex = Math.abs(hash) % choices.length;
+            } else {
+                selectedIndex = Math.floor(Math.random() * choices.length);
+            }
+
+            setTimeout(() => {
+                resCont.style.display = 'block';
+                document.getElementById('result').innerText = choices[selectedIndex];
+                document.getElementById('lucky-msg').innerText = `✨ 우주의 메시지: \n"${messages[Math.floor(Math.random() * messages.length)]}"`;
+            }, 800);
+
+        }, 5000);
+    }
+</script>
+
+</body>
+</html>
